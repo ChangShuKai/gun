@@ -51,10 +51,12 @@ jobs:
         run: |
           cd ios
           
-          # 建立 Node.js 軟連結，確保 Xcode PhaseScriptExecution 找得到 Node
-          sudo ln -s $(which node) /usr/local/bin/node || true
+          # 解決 Exit 65 的終極方法：強制將 Node 絕對路徑寫入 React Native 環境檔
+          echo "export NODE_BINARY=$(which node)" > .xcode.env
+          echo "export NODE_BINARY=$(which node)" > .xcode.env.local
           
-          export NODE_BINARY=$(which node)
+          # 建立軟連結以防萬一
+          sudo ln -s $(which node) /usr/local/bin/node || true
           
           # 自動偵測 Workspace 和 Scheme 名稱
           WORKSPACE_FILE=$(ls -d *.xcworkspace | head -n 1)
@@ -74,8 +76,7 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
             PROVISIONING_PROFILE_SPECIFIER="" \
-            ENABLE_USER_SCRIPT_SANDBOXING=NO \
-            NODE_BINARY=$(which node)
+            ENABLE_USER_SCRIPT_SANDBOXING=NO
 
       - name: Package iOS IPA
         run: |
