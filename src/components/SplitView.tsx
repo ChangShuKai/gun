@@ -1,27 +1,22 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   StyleSheet,
   View,
   Text,
   TouchableOpacity,
-  LayoutChangeEvent,
 } from 'react-native';
-import {
-  Gesture,
-  GestureDetector,
-} from 'react-native-gesture-handler';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  runOnJS,
-} from 'react-native-reanimated';
 import { Ionicons, Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
 import { THEME } from '../constants/theme';
-import { WidgetType } from '../types';
+import { WidgetType, SnapshotMetadata } from '../types';
+import { SplitViewContainer } from './SplitViewContainer';
 import { TimerWidget } from './TimerWidget';
 import { PhotoWidget } from './PhotoWidget';
 import { CameraWidget } from './CameraWidget';
+import { SelfCarouselWidget } from './widgets/SelfCarouselWidget';
+import { AnatomyMassageWidget } from './widgets/AnatomyMassageWidget';
+import { SensoryTickleWidget } from './widgets/SensoryTickleWidget';
+import { StretchingRoutineWidget } from './widgets/StretchingRoutineWidget';
+import { KegelTrainerWidget } from './3d/KegelTrainerWidget';
 
 interface SplitViewProps {
   topWidget: WidgetType;
@@ -34,6 +29,13 @@ interface SplitViewProps {
   onTopPhotoSelected: (uri: string) => void;
   onBottomPhotoSelected: (uri: string) => void;
   onTimerTick?: (seconds: number) => void;
+  elapsedSeconds?: number;
+  currentBPM?: number;
+  stage?: string;
+  arousalLevel?: number;
+  onSnapshotCaptured?: (snapshot: SnapshotMetadata) => void;
+  recentSnapshots?: SnapshotMetadata[];
+  onOpenCheckIn?: () => void;
 }
 
 export const SplitView: React.FC<SplitViewProps> = ({
@@ -47,56 +49,14 @@ export const SplitView: React.FC<SplitViewProps> = ({
   onTopPhotoSelected,
   onBottomPhotoSelected,
   onTimerTick,
+  elapsedSeconds,
+  currentBPM,
+  stage,
+  arousalLevel,
+  onSnapshotCaptured,
+  recentSnapshots,
+  onOpenCheckIn,
 }) => {
-  const [containerHeight, setContainerHeight] = useState<number>(500);
-  const ratio = useSharedValue(initialTopRatio || 0.5);
-  const startRatio = useSharedValue(initialTopRatio || 0.5);
-
-  const onLayout = (e: LayoutChangeEvent) => {
-    const { height } = e.nativeEvent.layout;
-    if (height > 0) {
-      setContainerHeight(height);
-    }
-  };
-
-  const notifyRatioChange = (val: number) => {
-    if (onRatioChange) onRatioChange(val);
-  };
-
-  const triggerHaptic = () => {
-    try {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    } catch {}
-  };
-
-  const panGesture = Gesture.Pan()
-    .onBegin(() => {
-      startRatio.value = ratio.value;
-      runOnJS(triggerHaptic)();
-    })
-    .onUpdate((event) => {
-      if (containerHeight > 0) {
-        const delta = event.translationY / containerHeight;
-        let newRatio = startRatio.value + delta;
-        // Clamp between 20% and 80%
-        if (newRatio < 0.2) newRatio = 0.2;
-        if (newRatio > 0.8) newRatio = 0.8;
-        ratio.value = newRatio;
-      }
-    })
-    .onEnd(() => {
-      runOnJS(notifyRatioChange)(ratio.value);
-      runOnJS(triggerHaptic)();
-    });
-
-  const topAnimatedStyle = useAnimatedStyle(() => ({
-    flex: ratio.value,
-  }));
-
-  const bottomAnimatedStyle = useAnimatedStyle(() => ({
-    flex: 1 - ratio.value,
-  }));
-
   const renderWidgetContent = (
     widget: WidgetType,
     pane: 'top' | 'bottom',
@@ -115,7 +75,31 @@ export const SplitView: React.FC<SplitViewProps> = ({
       );
     }
     if (widget === 'camera') {
-      return <CameraWidget />;
+      return (
+        <CameraWidget
+          elapsedSeconds={elapsedSeconds}
+          currentBPM={currentBPM}
+          stage={stage}
+          arousalLevel={arousalLevel}
+          onSnapshotCaptured={onSnapshotCaptured}
+          recentSnapshots={recentSnapshots}
+        />
+      );
+    }
+    if (widget === 'self_carousel') {
+      return <SelfCarouselWidget onOpenCheckIn={onOpenCheckIn} />;
+    }
+    if (widget === 'massage') {
+      return <AnatomyMassageWidget />;
+    }
+    if (widget === 'tickle') {
+      return <SensoryTickleWidget />;
+    }
+    if (widget === 'stretch') {
+      return <StretchingRoutineWidget />;
+    }
+    if (widget === 'kegel') {
+      return <KegelTrainerWidget />;
     }
 
     // Default: Empty state with large +
@@ -129,7 +113,7 @@ export const SplitView: React.FC<SplitViewProps> = ({
           <Ionicons name="add" size={36} color={THEME.colors.primaryLight} />
         </View>
         <Text style={styles.emptyTitle}>點擊加入小部件</Text>
-        <Text style={styles.emptySubtitle}>計時器・本地相片・即時鏡頭</Text>
+        <Text style={styles.emptySubtitle}>計時器・本地相片・即時鏡頭・看看自己</Text>
       </TouchableOpacity>
     );
   };
@@ -142,66 +126,71 @@ export const SplitView: React.FC<SplitViewProps> = ({
         return '本地相片';
       case 'camera':
         return '即時相機';
+      case 'self_carousel':
+        return '看看自己 (輪播)';
+      case 'massage':
+        return '周邊深層按摩';
+      case 'tickle':
+        return '微神經搔癢指引';
+      case 'stretch':
+        return '3D 延展牽引課表';
+      case 'kegel':
+        return 'PC 肌 3D 阻抗訓練';
+      case 'text':
+        return '讀稿機文本';
+      case 'pacing':
+        return '節奏控射動畫';
       default:
         return '未設定';
     }
   };
 
   return (
-    <View style={styles.container} onLayout={onLayout}>
-      {/* Top Pane */}
-      <Animated.View style={[styles.pane, topAnimatedStyle]}>
-        <View style={styles.paneHeader}>
-          <View style={styles.paneBadge}>
-            <Text style={styles.paneBadgeText}>上視窗：{getWidgetLabel(topWidget)}</Text>
-          </View>
-          <TouchableOpacity
-            style={styles.changeWidgetBtn}
-            onPress={() => onSelectWidgetPress('top')}
-            activeOpacity={0.7}
-          >
-            <Feather name="layers" size={14} color={THEME.colors.textSecondary} />
-            <Text style={styles.changeWidgetText}>更換</Text>
-          </TouchableOpacity>
-        </View>
-        <View style={styles.paneBody}>
-          {renderWidgetContent(topWidget, 'top', topPhotoUri, onTopPhotoSelected)}
-        </View>
-      </Animated.View>
-
-      {/* Draggable Divider Line */}
-      <GestureDetector gesture={panGesture}>
-        <View style={styles.dividerArea}>
-          <View style={styles.dividerLine}>
-            <View style={styles.grabberPill}>
-              <View style={styles.grabberDot} />
-              <View style={styles.grabberDot} />
-              <View style={styles.grabberDot} />
+    <SplitViewContainer
+      initialRatio={initialTopRatio || 0.5}
+      onRatioChange={onRatioChange}
+      style={styles.container}
+      topChild={
+        <View style={styles.pane}>
+          <View style={styles.paneHeader}>
+            <View style={styles.paneBadge}>
+              <Text style={styles.paneBadgeText}>上視窗：{getWidgetLabel(topWidget)}</Text>
             </View>
+            <TouchableOpacity
+              style={styles.changeWidgetBtn}
+              onPress={() => onSelectWidgetPress('top')}
+              activeOpacity={0.7}
+            >
+              <Feather name="layers" size={14} color={THEME.colors.textSecondary} />
+              <Text style={styles.changeWidgetText}>更換</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.paneBody}>
+            {renderWidgetContent(topWidget, 'top', topPhotoUri, onTopPhotoSelected)}
           </View>
         </View>
-      </GestureDetector>
-
-      {/* Bottom Pane */}
-      <Animated.View style={[styles.pane, bottomAnimatedStyle]}>
-        <View style={styles.paneHeader}>
-          <View style={styles.paneBadge}>
-            <Text style={styles.paneBadgeText}>下視窗：{getWidgetLabel(bottomWidget)}</Text>
+      }
+      bottomChild={
+        <View style={styles.pane}>
+          <View style={styles.paneHeader}>
+            <View style={styles.paneBadge}>
+              <Text style={styles.paneBadgeText}>下視窗：{getWidgetLabel(bottomWidget)}</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.changeWidgetBtn}
+              onPress={() => onSelectWidgetPress('bottom')}
+              activeOpacity={0.7}
+            >
+              <Feather name="layers" size={14} color={THEME.colors.textSecondary} />
+              <Text style={styles.changeWidgetText}>更換</Text>
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity
-            style={styles.changeWidgetBtn}
-            onPress={() => onSelectWidgetPress('bottom')}
-            activeOpacity={0.7}
-          >
-            <Feather name="layers" size={14} color={THEME.colors.textSecondary} />
-            <Text style={styles.changeWidgetText}>更換</Text>
-          </TouchableOpacity>
+          <View style={styles.paneBody}>
+            {renderWidgetContent(bottomWidget, 'bottom', bottomPhotoUri, onBottomPhotoSelected)}
+          </View>
         </View>
-        <View style={styles.paneBody}>
-          {renderWidgetContent(bottomWidget, 'bottom', bottomPhotoUri, onBottomPhotoSelected)}
-        </View>
-      </Animated.View>
-    </View>
+      }
+    />
   );
 };
 
@@ -211,6 +200,7 @@ const styles = StyleSheet.create({
     backgroundColor: THEME.colors.background,
   },
   pane: {
+    flex: 1,
     overflow: 'hidden',
     backgroundColor: THEME.colors.surface,
     position: 'relative',
@@ -258,68 +248,31 @@ const styles = StyleSheet.create({
   paneBody: {
     flex: 1,
   },
-  dividerArea: {
-    height: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: THEME.colors.background,
-    zIndex: 20,
-  },
-  dividerLine: {
-    width: '100%',
-    height: 3,
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  grabberPill: {
-    width: 60,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: THEME.colors.surfaceSubtle,
-    borderWidth: 1,
-    borderColor: THEME.colors.borderActive,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-  },
-  grabberDot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: THEME.colors.primaryLight,
-  },
   emptyCard: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 24,
-    borderWidth: 1.5,
-    borderStyle: 'dashed',
-    borderColor: 'rgba(255, 255, 255, 0.15)',
-    margin: 12,
-    borderRadius: THEME.radius.lg,
+    backgroundColor: THEME.colors.surfaceSubtle,
   },
   plusCircle: {
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: 'rgba(59, 130, 246, 0.12)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(59, 130, 246, 0.35)',
+    backgroundColor: 'rgba(59, 130, 246, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
   },
   emptyTitle: {
-    fontSize: 15,
-    fontWeight: '800',
+    fontSize: 16,
+    fontWeight: '700',
     color: THEME.colors.text,
     marginBottom: 4,
   },
   emptySubtitle: {
     fontSize: 12,
-    color: THEME.colors.textMuted,
+    color: THEME.colors.textSecondary,
+    textAlign: 'center',
   },
 });

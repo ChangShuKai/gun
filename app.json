@@ -15,8 +15,9 @@
       }
     },
     "android": {
+      "package": "com.healthtracker.app",
       "adaptiveIcon": {
-        "backgroundColor": "#0F172A",
+        "backgroundColor": "#FFFFFF",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -47,7 +48,8 @@
           "faceIDPermission": "允許使用 Face ID 解鎖健康紀錄與機密媒體"
         }
       ],
-      "expo-font"
+      "expo-font",
+      "expo-sharing"
     ]
   }
 }

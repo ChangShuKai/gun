@@ -104,6 +104,21 @@ export const GateScreen: React.FC = () => {
         {statusMessage ? (
           <Text style={styles.statusMessage}>{statusMessage}</Text>
         ) : null}
+
+        {/* Stealth Calculator Entry Button */}
+        <TouchableOpacity
+          style={styles.calculatorCoverBtn}
+          activeOpacity={0.7}
+          onPress={() => {
+            try {
+              void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            } catch {}
+            setCurrentScreen('calculator');
+          }}
+        >
+          <Ionicons name="calculator-outline" size={15} color="#64748B" />
+          <Text style={styles.calculatorCoverBtnText}>以偽裝計算機開啟</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Footer notice */}
@@ -205,6 +220,21 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#64748B',
     fontWeight: '500',
+  },
+  calculatorCoverBtn: {
+    marginTop: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    backgroundColor: '#F1F5F9',
+  },
+  calculatorCoverBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#64748B',
   },
   footer: {
     width: '100%',

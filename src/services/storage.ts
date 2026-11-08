@@ -14,6 +14,9 @@ const DEFAULT_SETTINGS: AppSettings = {
   stealthRecordingDefault: false,
   blurOnBackground: true,
   requireAuthOnResume: false,
+  calculatorCoverEnabled: false,
+  masterPin: '1314',
+  decoyPin: '9999',
 };
 
 export async function getIsFirstLaunch(): Promise<boolean> {

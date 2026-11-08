@@ -12,7 +12,7 @@ import {
 } from '../services/storage';
 import { initMediaSandbox } from '../services/mediaStorage';
 
-type AppScreen = 'gate' | 'onboarding' | 'main';
+type AppScreen = 'gate' | 'onboarding' | 'main' | 'calculator';
 type MainTab = 'action' | 'analytics';
 
 interface AppContextType {
@@ -24,6 +24,7 @@ interface AppContextType {
   isLoading: boolean;
   refreshRecords: () => Promise<void>;
   addRecord: (record: HabitRecord) => Promise<void>;
+  updateRecord: (record: HabitRecord) => Promise<void>;
   removeRecord: (recordId: string) => Promise<void>;
   
   // Apply Layout / 一鍵復刻
@@ -39,6 +40,10 @@ interface AppContextType {
   // Stealth recording state
   isStealthRecordingActive: boolean;
   setIsStealthRecordingActive: (active: boolean) => void;
+
+  // Decoy & Cover Mode
+  isDecoyMode: boolean;
+  setIsDecoyMode: (active: boolean) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -57,6 +62,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
   const [replicatedConfig, setReplicatedConfig] = useState<SplitConfig | null>(null);
   const [isStealthRecordingActive, setIsStealthRecordingActive] = useState<boolean>(false);
+  const [isDecoyMode, setIsDecoyMode] = useState<boolean>(false);
 
   // Initialize storage & sandbox
   useEffect(() => {
@@ -70,6 +76,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         setSettings({ ...loadedSettings, isFirstLaunch: firstLaunch });
         setRecords(loadedRecords);
+
+        if (!firstLaunch && loadedSettings.calculatorCoverEnabled) {
+          setCurrentScreen('calculator');
+        }
       } catch (e) {
         console.error('Initialization error:', e);
       } finally {
@@ -85,6 +95,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   const addRecord = useCallback(async (record: HabitRecord) => {
+    await saveRecordToStorage(record);
+    const updated = await getAllRecords();
+    setRecords(updated);
+  }, []);
+
+  const updateRecord = useCallback(async (record: HabitRecord) => {
     await saveRecordToStorage(record);
     const updated = await getAllRecords();
     setRecords(updated);
@@ -127,6 +143,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isLoading,
         refreshRecords,
         addRecord,
+        updateRecord,
         removeRecord,
         replicatedConfig,
         applyLayoutToWorkspace,
@@ -136,6 +153,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         completeOnboarding,
         isStealthRecordingActive,
         setIsStealthRecordingActive,
+        isDecoyMode,
+        setIsDecoyMode,
       }}
     >
       {children}

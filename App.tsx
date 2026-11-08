@@ -8,6 +8,7 @@ import { GateScreen } from './src/screens/GateScreen';
 import { OnboardingScreen } from './src/screens/OnboardingScreen';
 import { ActionScreen } from './src/screens/ActionScreen';
 import { AnalyticsScreen } from './src/screens/AnalyticsScreen';
+import { CalculatorCoverScreen } from './src/screens/CalculatorCoverScreen';
 import { LiquidGlassDock } from './src/components/LiquidGlassDock';
 import { PrivacyBlurOverlay } from './src/components/PrivacyBlurOverlay';
 import { useAppStatePrivacy } from './src/hooks/useAppStatePrivacy';
@@ -21,6 +22,8 @@ function MainNavigator() {
     switch (currentScreen) {
       case 'gate':
         return <GateScreen />;
+      case 'calculator':
+        return <CalculatorCoverScreen />;
       case 'onboarding':
         return <OnboardingScreen />;
       case 'main':
