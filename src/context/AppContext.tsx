@@ -8,9 +8,16 @@ import {
   setFirstLaunchComplete,
   getAppSettings,
   saveAppSettings,
-  seedDemoRecordsIfEmpty,
+  getActiveSplitConfig,
+  saveActiveSplitConfig,
+  DEFAULT_SPLIT_CONFIG,
 } from '../services/storage';
-import { initMediaSandbox } from '../services/mediaStorage';
+import {
+  initMediaSandbox,
+  deleteSandboxMedia,
+  getSandboxStats,
+  SandboxStats,
+} from '../services/mediaStorage';
 
 type AppScreen = 'gate' | 'onboarding' | 'main' | 'calculator';
 type MainTab = 'action' | 'analytics';
@@ -26,7 +33,11 @@ interface AppContextType {
   addRecord: (record: HabitRecord) => Promise<void>;
   updateRecord: (record: HabitRecord) => Promise<void>;
   removeRecord: (recordId: string) => Promise<void>;
-  
+
+  // Active Split Layout Persistence
+  activeSplitConfig: SplitConfig;
+  updateActiveSplitConfig: (config: Partial<SplitConfig>) => Promise<void>;
+
   // Apply Layout / 一鍵復刻
   replicatedConfig: SplitConfig | null;
   applyLayoutToWorkspace: (config: SplitConfig) => void;
@@ -36,14 +47,20 @@ interface AppContextType {
   settings: AppSettings;
   updateSettings: (newSettings: Partial<AppSettings>) => Promise<void>;
   completeOnboarding: () => Promise<void>;
-  
+
   // Stealth recording state
   isStealthRecordingActive: boolean;
   setIsStealthRecordingActive: (active: boolean) => void;
 
+<<<<<<< Updated upstream
   // Decoy & Cover Mode
   isDecoyMode: boolean;
   setIsDecoyMode: (active: boolean) => void;
+=======
+  // Sandbox Storage Stats (for real storage transparency)
+  sandboxStats: SandboxStats;
+  refreshSandboxStats: () => Promise<void>;
+>>>>>>> Stashed changes
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -60,28 +77,44 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     blurOnBackground: true,
     requireAuthOnResume: false,
   });
+  const [activeSplitConfig, setActiveSplitConfig] = useState<SplitConfig>(DEFAULT_SPLIT_CONFIG);
   const [replicatedConfig, setReplicatedConfig] = useState<SplitConfig | null>(null);
   const [isStealthRecordingActive, setIsStealthRecordingActive] = useState<boolean>(false);
+<<<<<<< Updated upstream
   const [isDecoyMode, setIsDecoyMode] = useState<boolean>(false);
+=======
+  const [sandboxStats, setSandboxStats] = useState<SandboxStats>({
+    imageCount: 0,
+    videoCount: 0,
+    totalSizeBytes: 0,
+    formattedSize: '0 KB',
+  });
+>>>>>>> Stashed changes
 
-  // Initialize storage & sandbox
+  // Initialize storage & sandbox with 100% real local data
   useEffect(() => {
     async function init() {
       try {
         await initMediaSandbox();
-        await seedDemoRecordsIfEmpty();
         const firstLaunch = await getIsFirstLaunch();
         const loadedSettings = await getAppSettings();
         const loadedRecords = await getAllRecords();
+        const savedConfig = await getActiveSplitConfig();
+        const stats = await getSandboxStats();
 
         setSettings({ ...loadedSettings, isFirstLaunch: firstLaunch });
         setRecords(loadedRecords);
+<<<<<<< Updated upstream
 
         if (!firstLaunch && loadedSettings.calculatorCoverEnabled) {
           setCurrentScreen('calculator');
         }
+=======
+        setActiveSplitConfig(savedConfig);
+        setSandboxStats(stats);
+>>>>>>> Stashed changes
       } catch (e) {
-        console.error('Initialization error:', e);
+        console.error('[AppContext] Initialization error:', e);
       } finally {
         setIsLoading(false);
       }
@@ -89,16 +122,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     init();
   }, []);
 
+  const refreshSandboxStats = useCallback(async () => {
+    const stats = await getSandboxStats();
+    setSandboxStats(stats);
+  }, []);
+
   const refreshRecords = useCallback(async () => {
     const list = await getAllRecords();
     setRecords(list);
-  }, []);
+    await refreshSandboxStats();
+  }, [refreshSandboxStats]);
 
   const addRecord = useCallback(async (record: HabitRecord) => {
     await saveRecordToStorage(record);
     const updated = await getAllRecords();
     setRecords(updated);
-  }, []);
+    await refreshSandboxStats();
+  }, [refreshSandboxStats]);
 
   const updateRecord = useCallback(async (record: HabitRecord) => {
     await saveRecordToStorage(record);
@@ -107,9 +147,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   const removeRecord = useCallback(async (recordId: string) => {
+    // Check if the record has an associated video in sandbox
+    const target = records.find((r) => r.id === recordId);
+    if (target && target.videoUri) {
+      await deleteSandboxMedia(target.videoUri);
+    }
     await deleteRecordFromStorage(recordId);
     const updated = await getAllRecords();
     setRecords(updated);
+    await refreshSandboxStats();
+  }, [records, refreshSandboxStats]);
+
+  const updateActiveSplitConfig = useCallback(async (newConfig: Partial<SplitConfig>) => {
+    setActiveSplitConfig((prev) => {
+      const merged = { ...prev, ...newConfig };
+      saveActiveSplitConfig(merged).catch((err) =>
+        console.error('[AppContext] Error saving split config:', err)
+      );
+      return merged;
+    });
   }, []);
 
   const completeOnboarding = useCallback(async () => {
@@ -125,6 +181,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const applyLayoutToWorkspace = useCallback((config: SplitConfig) => {
     setReplicatedConfig(config);
+    setActiveSplitConfig(config);
+    saveActiveSplitConfig(config).catch(() => {});
     setActiveTab('action');
   }, []);
 
@@ -145,6 +203,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addRecord,
         updateRecord,
         removeRecord,
+        activeSplitConfig,
+        updateActiveSplitConfig,
         replicatedConfig,
         applyLayoutToWorkspace,
         clearReplicatedConfig,
@@ -153,8 +213,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         completeOnboarding,
         isStealthRecordingActive,
         setIsStealthRecordingActive,
+<<<<<<< Updated upstream
         isDecoyMode,
         setIsDecoyMode,
+=======
+        sandboxStats,
+        refreshSandboxStats,
+>>>>>>> Stashed changes
       }}
     >
       {children}

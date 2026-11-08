@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -21,19 +21,36 @@ export const TimerWidget: React.FC<TimerWidgetProps> = ({
   // Sync with parent running state if provided
   const running = parentIsRunning !== undefined ? parentIsRunning : isActive;
 
+  // Stable reference for callback to prevent interval resets
+  const tickRef = useRef(onTimerTick);
   useEffect(() => {
-    let interval: any = null;
-    if (running) {
-      interval = setInterval(() => {
-        setSeconds((prev) => {
-          const next = prev + 1;
-          if (onTimerTick) onTimerTick(next);
-          return next;
-        });
-      }, 1000);
-    }
+    tickRef.current = onTimerTick;
+  }, [onTimerTick]);
+
+  const startTimeRef = useRef<number>(0);
+  const runningRef = useRef<boolean>(running);
+
+  useEffect(() => {
+    runningRef.current = running;
+  }, [running]);
+
+  useEffect(() => {
+    if (!running) return;
+
+    startTimeRef.current = Date.now() - seconds * 1000;
+
+    const interval = setInterval(() => {
+      if (!runningRef.current) return;
+      const elapsed = Math.max(0, Math.floor((Date.now() - startTimeRef.current) / 1000));
+      setSeconds(elapsed);
+      if (tickRef.current) {
+        tickRef.current(elapsed);
+      }
+    }, 500);
+
     return () => clearInterval(interval);
-  }, [running, onTimerTick]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [running]);
 
   const toggleRunning = async () => {
     try {
@@ -46,8 +63,9 @@ export const TimerWidget: React.FC<TimerWidgetProps> = ({
     try {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     } catch {}
+    startTimeRef.current = Date.now();
     setSeconds(0);
-    if (onTimerTick) onTimerTick(0);
+    if (tickRef.current) tickRef.current(0);
   };
 
   const formatTime = (totalSeconds: number) => {
@@ -103,25 +121,25 @@ export const TimerWidget: React.FC<TimerWidgetProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: THEME.colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: THEME.colors.surface,
     padding: 16,
   },
   badgeRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    paddingHorizontal: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: THEME.radius.full,
     marginBottom: 12,
   },
   statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
   statusDotActive: {
     backgroundColor: THEME.colors.success,
@@ -130,32 +148,31 @@ const styles = StyleSheet.create({
     backgroundColor: THEME.colors.warning,
   },
   statusText: {
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: 11,
     color: THEME.colors.textSecondary,
-    letterSpacing: 0.3,
+    fontWeight: '600',
   },
   timerDisplay: {
-    fontSize: 52,
+    fontSize: 48,
     fontWeight: '900',
-    fontVariant: ['tabular-nums'],
     color: THEME.colors.text,
     letterSpacing: 2,
-    marginBottom: 14,
+    fontVariant: ['tabular-nums'],
+    marginBottom: 16,
   },
   controlsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
     gap: 16,
+    alignItems: 'center',
   },
   controlBtn: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: THEME.colors.surfaceSubtle,
-    borderWidth: 1,
-    borderColor: THEME.colors.borderGlass,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: THEME.colors.borderGlass,
   },
 });

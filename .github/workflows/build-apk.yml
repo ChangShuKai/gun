@@ -1,0 +1,103 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      runner:
+        description: '執行環境 (Runner) - 預設為自託管烏幫徒 (Ubuntu) 電腦'
+        required: true
+        default: 'self-hosted'
+        type: choice
+        options:
+          - 'self-hosted'
+          - 'ubuntu-latest'
+      build_type:
+        description: '構建類型 (Release 為極致優化版，Debug 為除錯版)'
+        required: true
+        default: 'release'
+        type: choice
+        options:
+          - 'release'
+          - 'debug'
+
+jobs:
+  build-android:
+    runs-on: ${{ github.event.inputs.runner || 'self-hosted' }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Setup Java JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Accept Android SDK Licenses
+        run: |
+          yes | sdkmanager --licenses || true
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Prebuild Android Native Project
+        run: npx expo prebuild --platform android --clean
+
+      - name: Configure Android Signing & Gradle
+        run: |
+          node -e "
+          const fs = require('fs');
+          const file = 'android/app/build.gradle';
+          if (fs.existsSync(file)) {
+            let content = fs.readFileSync(file, 'utf8');
+            if (content.includes('signingConfig signingConfigs.release')) {
+              content = content.replace('signingConfig signingConfigs.release', 'signingConfig signingConfigs.debug');
+            } else if (/buildTypes\s*\{[\s\S]*?release\s*\{/.test(content)) {
+              content = content.replace(/(buildTypes\s*\{[\s\S]*?release\s*\{)/, '$1\n            signingConfig signingConfigs.debug');
+            }
+            fs.writeFileSync(file, content);
+            console.log('Successfully patched android/app/build.gradle for universal installation');
+          }
+          "
+
+      - name: Build Android APK (${{ github.event.inputs.build_type || 'release' }})
+        run: |
+          cd android
+          chmod +x gradlew
+          if [ "${{ github.event.inputs.build_type || 'release' }}" = "debug" ]; then
+            echo "Building Debug APK..."
+            ./gradlew assembleDebug --no-daemon
+          else
+            echo "Building Universal Release APK..."
+            ./gradlew assembleRelease --no-daemon
+          fi
+          cd ..
+
+      - name: Collect & Verify APK Output
+        run: |
+          mkdir -p apk-output
+          APK_COUNT=$(find android/app/build/outputs/apk -type f -name "*.apk" | wc -l)
+          if [ "$APK_COUNT" -eq 0 ]; then
+            echo "Error: No APK files found in android/app/build/outputs/apk"
+            exit 1
+          fi
+
+          find android/app/build/outputs/apk -type f -name "*.apk" -exec cp {} apk-output/ \;
+          echo "Found and collected APK files:"
+          ls -lh apk-output/
+
+      - name: Upload Android APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Android-APK-Build
+          path: "apk-output/*.apk"
+          retention-days: 7

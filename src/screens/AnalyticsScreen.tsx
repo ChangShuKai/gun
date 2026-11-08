@@ -38,7 +38,17 @@ import { authenticateWithBiometrics } from '../services/authService';
 import { ExportService } from '../services/exportService';
 
 export const AnalyticsScreen: React.FC = () => {
+<<<<<<< Updated upstream
   const { records, applyLayoutToWorkspace, updateRecord } = useApp();
+=======
+  const {
+    records,
+    removeRecord,
+    applyLayoutToWorkspace,
+    setActiveTab,
+    sandboxStats,
+  } = useApp();
+>>>>>>> Stashed changes
 
   // Selected date for heatmap filter: default to today (YYYY-MM-DD)
   const todayStr = useMemo(() => {
@@ -254,6 +264,7 @@ export const AnalyticsScreen: React.FC = () => {
     applyLayoutToWorkspace(record.splitConfig);
   };
 
+<<<<<<< Updated upstream
   // Export Actions: CSV or Encrypted .vault Container
   const handleExportReport = async () => {
     try {
@@ -284,6 +295,29 @@ export const AnalyticsScreen: React.FC = () => {
           },
         },
         { text: '取消', style: 'cancel' },
+=======
+  // Delete Record
+  const handleDeleteRecord = (record: HabitRecord) => {
+    Alert.alert(
+      '刪除本地紀錄',
+      '確定要自本地持久化存儲中永久刪除此筆紀錄？若含有機密錄影，其本地檔案也將一併自沙盒抹除。',
+      [
+        { text: '取消', style: 'cancel' },
+        {
+          text: '確認刪除',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await removeRecord(record.id);
+              try {
+                await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              } catch {}
+            } catch (err: any) {
+              Alert.alert('刪除失敗', err?.message || '無法刪除紀錄');
+            }
+          },
+        },
+>>>>>>> Stashed changes
       ]
     );
   };
@@ -300,10 +334,24 @@ export const AnalyticsScreen: React.FC = () => {
             <Ionicons name="time-outline" size={14} color={THEME.colors.primaryLight} />
             <Text style={styles.timeText}>{item.timeString}</Text>
           </View>
-          <View style={styles.durationBadge}>
-            <Text style={styles.durationText}>
-              {mins > 0 ? `${mins} 分 ` : ''}{secs} 秒
-            </Text>
+          <View style={styles.headerRightBadges}>
+            {item.rating && (
+              <View style={styles.starsRow}>
+                {[1, 2, 3, 4, 5].map((s) => (
+                  <Ionicons
+                    key={s}
+                    name={s <= item.rating! ? 'star' : 'star-outline'}
+                    size={12}
+                    color={s <= item.rating! ? '#F59E0B' : THEME.colors.textMuted}
+                  />
+                ))}
+              </View>
+            )}
+            <View style={styles.durationBadge}>
+              <Text style={styles.durationText}>
+                {mins > 0 ? `${mins} 分 ` : ''}{secs} 秒
+              </Text>
+            </View>
           </View>
         </View>
 
@@ -323,6 +371,7 @@ export const AnalyticsScreen: React.FC = () => {
           </Text>
         </View>
 
+<<<<<<< Updated upstream
         {/* Special Quest Badge & Status if present */}
         {item.quest && (
           <View style={styles.questRecordBanner}>
@@ -399,35 +448,53 @@ export const AnalyticsScreen: React.FC = () => {
                 解鎖時序狀態對比 (A/B 滑動對比與 EHS 評級)
               </Text>
             </TouchableOpacity>
+=======
+        {/* Notes if present */}
+        {item.notes && (
+          <View style={styles.notesRow}>
+            <Ionicons name="chatbubble-ellipses-outline" size={13} color={THEME.colors.textMuted} />
+            <Text style={styles.notesText}>{item.notes}</Text>
+>>>>>>> Stashed changes
           </View>
         )}
 
         {/* Actions Row */}
         <View style={styles.recordActionsRow}>
-          {/* Watch video button (if videoUri exists) */}
-          {item.videoUri ? (
+          <View style={styles.actionsLeft}>
+            {/* Watch video button (if videoUri exists) */}
+            {item.videoUri ? (
+              <TouchableOpacity
+                style={styles.watchVideoBtn}
+                onPress={() => handleWatchVideo(item.videoUri!)}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="lock-closed" size={13} color="#FFFFFF" />
+                <Text style={styles.watchVideoBtnText}>🔒 觀看錄影</Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.noVideoPlaceholder}>
+                <Text style={styles.noVideoText}>無背景錄影</Text>
+              </View>
+            )}
+
+            {/* Apply Layout / 一鍵復刻 Button */}
             <TouchableOpacity
-              style={styles.watchVideoBtn}
-              onPress={() => handleWatchVideo(item.videoUri!)}
+              style={styles.applyLayoutBtn}
+              onPress={() => handleApplyLayout(item)}
               activeOpacity={0.8}
             >
-              <Ionicons name="lock-closed" size={14} color="#FFFFFF" />
-              <Text style={styles.watchVideoBtnText}>🔒 觀看錄影</Text>
+              <Feather name="copy" size={12} color={THEME.colors.primaryLight} />
+              <Text style={styles.applyLayoutBtnText}>一鍵復刻</Text>
             </TouchableOpacity>
-          ) : (
-            <View style={styles.noVideoPlaceholder}>
-              <Text style={styles.noVideoText}>無背景錄影</Text>
-            </View>
-          )}
+          </View>
 
-          {/* Apply Layout / 一鍵復刻 Button */}
+          {/* Delete Button */}
           <TouchableOpacity
-            style={styles.applyLayoutBtn}
-            onPress={() => handleApplyLayout(item)}
-            activeOpacity={0.8}
+            style={styles.deleteRecordBtn}
+            onPress={() => handleDeleteRecord(item)}
+            activeOpacity={0.7}
           >
-            <Feather name="copy" size={13} color={THEME.colors.primaryLight} />
-            <Text style={styles.applyLayoutBtnText}>一鍵復刻佈局</Text>
+            <Ionicons name="trash-outline" size={15} color={THEME.colors.danger} />
           </TouchableOpacity>
         </View>
       </View>
@@ -438,6 +505,7 @@ export const AnalyticsScreen: React.FC = () => {
     <SafeAreaView style={styles.container}>
       {/* Top Header */}
       <View style={styles.header}>
+<<<<<<< Updated upstream
         <View style={styles.headerLeft}>
           <Text style={styles.pageTitle}>健康分析儀表板</Text>
           <Text style={styles.pageSubtitle}>本地數據統計與習慣趨勢</Text>
@@ -489,6 +557,10 @@ export const AnalyticsScreen: React.FC = () => {
             <Text style={styles.exportReportBtnText}>匯出</Text>
           </TouchableOpacity>
         </View>
+=======
+        <Text style={styles.pageTitle}>健康分析儀表板</Text>
+        <Text style={styles.pageSubtitle}>100% 真實本地數據統計與習慣趨勢</Text>
+>>>>>>> Stashed changes
       </View>
 
       <FlatList
@@ -498,6 +570,7 @@ export const AnalyticsScreen: React.FC = () => {
         contentContainerStyle={styles.scrollList}
         ListHeaderComponent={
           <View style={styles.listHeader}>
+<<<<<<< Updated upstream
             {/* 0. Breaking News Teaser Banner */}
             <TouchableOpacity
               style={styles.breakingNewsBanner}
@@ -527,6 +600,43 @@ export const AnalyticsScreen: React.FC = () => {
               records={records}
               onOpenPledgeModal={() => setPledgeBetModalVisible(true)}
             />
+=======
+            {/* Storage Transparency & Real Data Status Card */}
+            <View style={styles.storageStatsCard}>
+              <View style={styles.storageTop}>
+                <View style={styles.storageTitleGroup}>
+                  <Ionicons name="server-outline" size={16} color={THEME.colors.primaryLight} />
+                  <Text style={styles.storageTitle}>本地真實資料庫存狀態</Text>
+                </View>
+                <View style={styles.realDataBadge}>
+                  <Ionicons name="checkmark-done" size={12} color={THEME.colors.success} />
+                  <Text style={styles.realDataBadgeText}>真實寫入</Text>
+                </View>
+              </View>
+
+              <View style={styles.storageStatsGrid}>
+                <View style={styles.storageStatCol}>
+                  <Text style={styles.storageStatNum}>{records.length}</Text>
+                  <Text style={styles.storageStatLabel}>真實紀錄筆數</Text>
+                </View>
+                <View style={styles.storageStatDivider} />
+                <View style={styles.storageStatCol}>
+                  <Text style={styles.storageStatNum}>{sandboxStats.imageCount}</Text>
+                  <Text style={styles.storageStatLabel}>沙盒相片</Text>
+                </View>
+                <View style={styles.storageStatDivider} />
+                <View style={styles.storageStatCol}>
+                  <Text style={styles.storageStatNum}>{sandboxStats.videoCount}</Text>
+                  <Text style={styles.storageStatLabel}>機密錄影</Text>
+                </View>
+                <View style={styles.storageStatDivider} />
+                <View style={styles.storageStatCol}>
+                  <Text style={styles.storageStatNum}>{sandboxStats.formattedSize}</Text>
+                  <Text style={styles.storageStatLabel}>磁碟占用</Text>
+                </View>
+              </View>
+            </View>
+>>>>>>> Stashed changes
 
             {/* 1. Today Stats Card */}
             <View style={styles.statsCard}>
@@ -534,7 +644,7 @@ export const AnalyticsScreen: React.FC = () => {
                 <Text style={styles.cardHeaderTitle}>今日狀態指標</Text>
                 <View style={styles.offlineShield}>
                   <Ionicons name="shield-checkmark" size={12} color={THEME.colors.success} />
-                  <Text style={styles.offlineShieldText}>本地隱私</Text>
+                  <Text style={styles.offlineShieldText}>純離線沙盒</Text>
                 </View>
               </View>
 
@@ -744,13 +854,33 @@ export const AnalyticsScreen: React.FC = () => {
           </View>
         }
         ListEmptyComponent={
-          <View style={styles.emptyRecords}>
-            <Ionicons name="calendar-outline" size={40} color={THEME.colors.textMuted} />
-            <Text style={styles.emptyRecordsTitle}>該日期無活動紀錄</Text>
-            <Text style={styles.emptyRecordsSub}>
-              點擊熱點圖上的其他有色日期，或至「尻尻」頁面展開新體驗
-            </Text>
-          </View>
+          records.length === 0 ? (
+            <View style={styles.emptyRecords}>
+              <View style={styles.emptyIconCircle}>
+                <Ionicons name="shield-checkmark-outline" size={36} color={THEME.colors.primaryLight} />
+              </View>
+              <Text style={styles.emptyRecordsTitle}>尚無真實活動紀錄</Text>
+              <Text style={styles.emptyRecordsSub}>
+                本應用已全面採用 100% 真實本地數據存儲。點擊下方按鈕前往「尻尻」頁面展開您的第一次體驗！
+              </Text>
+              <TouchableOpacity
+                style={styles.emptyActionBtn}
+                onPress={() => setActiveTab('action')}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="play" size={16} color="#FFFFFF" />
+                <Text style={styles.emptyActionBtnText}>前往展開第一次體驗</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={styles.emptyRecords}>
+              <Ionicons name="calendar-outline" size={40} color={THEME.colors.textMuted} />
+              <Text style={styles.emptyRecordsTitle}>該日期無活動紀錄</Text>
+              <Text style={styles.emptyRecordsSub}>
+                點擊熱點圖上的其他有色日期，或至「尻尻」頁面展開新體驗
+              </Text>
+            </View>
+          )
         }
       />
 
@@ -1376,6 +1506,71 @@ const styles = StyleSheet.create({
     gap: 16,
     marginBottom: 8,
   },
+  storageStatsCard: {
+    backgroundColor: 'rgba(59, 130, 246, 0.06)',
+    padding: 14,
+    borderRadius: THEME.radius.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(59, 130, 246, 0.2)',
+  },
+  storageTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  storageTitleGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  storageTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: THEME.colors.text,
+  },
+  realDataBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: THEME.radius.full,
+  },
+  realDataBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: THEME.colors.success,
+  },
+  storageStatsGrid: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: THEME.colors.surfaceSubtle,
+    paddingVertical: 10,
+    paddingHorizontal: 6,
+    borderRadius: THEME.radius.md,
+  },
+  storageStatCol: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  storageStatNum: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: THEME.colors.text,
+  },
+  storageStatLabel: {
+    fontSize: 10,
+    color: THEME.colors.textMuted,
+    marginTop: 2,
+  },
+  storageStatDivider: {
+    width: 1,
+    height: 22,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+  },
   statsCard: {
     backgroundColor: THEME.colors.surface,
     padding: 18,
@@ -1491,6 +1686,15 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: THEME.colors.text,
   },
+  headerRightBadges: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  starsRow: {
+    flexDirection: 'row',
+    gap: 2,
+  },
   durationBadge: {
     backgroundColor: 'rgba(255, 255, 255, 0.06)',
     paddingHorizontal: 10,
@@ -1512,6 +1716,20 @@ const styles = StyleSheet.create({
     color: THEME.colors.textSecondary,
     fontWeight: '500',
   },
+  notesRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: THEME.radius.sm,
+  },
+  notesText: {
+    fontSize: 12,
+    color: THEME.colors.textSecondary,
+    fontStyle: 'italic',
+  },
   recordActionsRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1519,19 +1737,23 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     borderTopWidth: 1,
     borderTopColor: 'rgba(255, 255, 255, 0.06)',
+  },
+  actionsLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 8,
   },
   watchVideoBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
     backgroundColor: THEME.colors.primaryDark,
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: THEME.radius.md,
   },
   watchVideoBtnText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
     color: '#FFFFFF',
   },
@@ -1545,19 +1767,20 @@ const styles = StyleSheet.create({
   applyLayoutBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
     backgroundColor: 'rgba(59, 130, 246, 0.12)',
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: THEME.radius.md,
     borderWidth: 1,
     borderColor: 'rgba(59, 130, 246, 0.35)',
   },
   applyLayoutBtnText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
     color: THEME.colors.primaryLight,
   },
+<<<<<<< Updated upstream
   questRecordBanner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1700,24 +1923,58 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     color: '#FFFFFF',
+=======
+  deleteRecordBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.25)',
+>>>>>>> Stashed changes
   },
   emptyRecords: {
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 36,
-    gap: 8,
+    gap: 10,
+  },
+  emptyIconCircle: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    backgroundColor: 'rgba(59, 130, 246, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
   },
   emptyRecordsTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: THEME.colors.textSecondary,
-    marginTop: 6,
+    fontSize: 16,
+    fontWeight: '800',
+    color: THEME.colors.text,
   },
   emptyRecordsSub: {
     fontSize: 12,
     color: THEME.colors.textMuted,
     textAlign: 'center',
-    maxWidth: 260,
+    maxWidth: 280,
     lineHeight: 18,
+  },
+  emptyActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: THEME.colors.primary,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: THEME.radius.full,
+    marginTop: 8,
+  },
+  emptyActionBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
 });

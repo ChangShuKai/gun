@@ -1,11 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { HabitRecord, AppSettings, DayStats } from '../types';
+import { HabitRecord, AppSettings, DayStats, SplitConfig } from '../types';
 
 const STORAGE_KEYS = {
   RECORDS: '@health_tracker_records_v1',
   SETTINGS: '@health_tracker_settings_v1',
   IS_FIRST_LAUNCH: '@health_tracker_first_launch_v1',
-  ACTIVE_SPLIT_CONFIG: '@health_tracker_active_split_config',
+  ACTIVE_SPLIT_CONFIG: '@health_tracker_active_split_config_v1',
 };
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -17,6 +17,15 @@ const DEFAULT_SETTINGS: AppSettings = {
   calculatorCoverEnabled: false,
   masterPin: '1314',
   decoyPin: '9999',
+};
+
+export const DEFAULT_SPLIT_CONFIG: SplitConfig = {
+  mode: 'split_view',
+  topWidget: 'timer',
+  bottomWidget: 'photo',
+  topRatio: 0.5,
+  topPhotoUri: null,
+  bottomPhotoUri: null,
 };
 
 export async function getIsFirstLaunch(): Promise<boolean> {
@@ -33,7 +42,7 @@ export async function setFirstLaunchComplete(): Promise<void> {
   try {
     await AsyncStorage.setItem(STORAGE_KEYS.IS_FIRST_LAUNCH, JSON.stringify(false));
   } catch (e) {
-    console.error('Failed to set first launch complete:', e);
+    console.error('[Storage] Failed to set first launch complete:', e);
   }
 }
 
@@ -54,37 +63,101 @@ export async function saveAppSettings(newSettings: Partial<AppSettings>): Promis
   return updated;
 }
 
+/**
+ * Loads all real local habit records.
+ * Purges any legacy fake/demo records from storage to ensure 100% data authenticity.
+ */
 export async function getAllRecords(): Promise<HabitRecord[]> {
   try {
     const json = await AsyncStorage.getItem(STORAGE_KEYS.RECORDS);
     if (!json) return [];
     const parsed: HabitRecord[] = JSON.parse(json);
+
+    // Filter out any mock/demo records so only 100% real local records exist
+    const realRecords = parsed.filter(
+      (r) => r && r.id && !r.id.startsWith('demo_')
+    );
+
+    // If legacy mock records were found, write back only real records to clean storage
+    if (realRecords.length !== parsed.length) {
+      await AsyncStorage.setItem(STORAGE_KEYS.RECORDS, JSON.stringify(realRecords));
+      console.log(`[Storage] Purged ${parsed.length - realRecords.length} legacy demo records.`);
+    }
+
     // Sort descending by timestamp
-    return parsed.sort((a, b) => b.timestamp - a.timestamp);
+    return realRecords.sort((a, b) => b.timestamp - a.timestamp);
   } catch (error) {
-    console.error('Failed to load records:', error);
+    console.error('[Storage] Failed to load records:', error);
     return [];
   }
 }
 
+/**
+ * Saves a real local record to persistent storage and verifies write integrity.
+ */
 export async function saveRecord(record: HabitRecord): Promise<void> {
   try {
     const currentRecords = await getAllRecords();
     const updated = [record, ...currentRecords.filter((r) => r.id !== record.id)];
-    await AsyncStorage.setItem(STORAGE_KEYS.RECORDS, JSON.stringify(updated));
+    const payload = JSON.stringify(updated);
+    
+    // Write to AsyncStorage
+    await AsyncStorage.setItem(STORAGE_KEYS.RECORDS, payload);
+
+    // Verify write integrity (read-after-write)
+    const verification = await AsyncStorage.getItem(STORAGE_KEYS.RECORDS);
+    if (!verification) {
+      throw new Error('Storage write verification failed: read returned null');
+    }
+    const verifiedList: HabitRecord[] = JSON.parse(verification);
+    const found = verifiedList.some((r) => r.id === record.id);
+    if (!found) {
+      throw new Error(`Storage write verification failed: record ${record.id} not found in saved list`);
+    }
+
+    console.log(`[Storage] Successfully saved and verified record ${record.id} (total: ${verifiedList.length})`);
   } catch (error) {
-    console.error('Failed to save record:', error);
+    console.error('[Storage] Failed to save record:', error);
     throw error;
   }
 }
 
+/**
+ * Deletes a record by ID from persistent storage and verifies removal.
+ */
 export async function deleteRecord(recordId: string): Promise<void> {
   try {
     const currentRecords = await getAllRecords();
     const updated = currentRecords.filter((r) => r.id !== recordId);
     await AsyncStorage.setItem(STORAGE_KEYS.RECORDS, JSON.stringify(updated));
+    console.log(`[Storage] Record ${recordId} deleted successfully.`);
   } catch (error) {
-    console.error('Failed to delete record:', error);
+    console.error('[Storage] Failed to delete record:', error);
+    throw error;
+  }
+}
+
+/**
+ * Loads the active workspace split layout and photo configuration.
+ */
+export async function getActiveSplitConfig(): Promise<SplitConfig> {
+  try {
+    const json = await AsyncStorage.getItem(STORAGE_KEYS.ACTIVE_SPLIT_CONFIG);
+    if (!json) return DEFAULT_SPLIT_CONFIG;
+    return { ...DEFAULT_SPLIT_CONFIG, ...JSON.parse(json) };
+  } catch {
+    return DEFAULT_SPLIT_CONFIG;
+  }
+}
+
+/**
+ * Persists the active workspace split layout and photo configuration.
+ */
+export async function saveActiveSplitConfig(config: SplitConfig): Promise<void> {
+  try {
+    await AsyncStorage.setItem(STORAGE_KEYS.ACTIVE_SPLIT_CONFIG, JSON.stringify(config));
+  } catch (error) {
+    console.error('[Storage] Failed to save active split config:', error);
   }
 }
 
@@ -113,40 +186,13 @@ export function aggregateRecordsByDate(records: HabitRecord[]): Record<string, D
 }
 
 /**
- * Helper to generate demo records for initial testing and heatmap demonstration
+ * Clears all local records (for testing or user data wipe)
  */
-export async function seedDemoRecordsIfEmpty(): Promise<void> {
-  const existing = await getAllRecords();
-  if (existing.length > 0) return;
-
-  const now = new Date();
-  const demoRecords: HabitRecord[] = [];
-
-  // Generate some past records over the last 14 days
-  const sampleOffsets = [0, 0, 1, 2, 4, 5, 5, 7, 9, 10, 12, 14];
-  sampleOffsets.forEach((dayOffset, idx) => {
-    const targetDate = new Date(now.getTime() - dayOffset * 86400000);
-    const dateStr = targetDate.toISOString().split('T')[0];
-    const hours = (14 + (idx % 8)).toString().padStart(2, '0');
-    const minutes = (10 + (idx * 7) % 50).toString().padStart(2, '0');
-    
-    demoRecords.push({
-      id: `demo_${Date.now()}_${idx}`,
-      timestamp: targetDate.getTime() - idx * 3600000,
-      dateString: dateStr,
-      timeString: `${hours}:${minutes}`,
-      durationSeconds: 420 + (idx * 115) % 900, // 7 to 22 mins
-      layoutMode: idx % 2 === 0 ? 'split_view' : 'fullscreen_timer',
-      splitConfig: {
-        mode: idx % 2 === 0 ? 'split_view' : 'fullscreen_timer',
-        topWidget: 'timer',
-        bottomWidget: 'photo',
-        topRatio: 0.45,
-      },
-      videoUri: null,
-      notes: idx % 3 === 0 ? '身心放鬆，節奏穩定' : undefined,
-    });
-  });
-
-  await AsyncStorage.setItem(STORAGE_KEYS.RECORDS, JSON.stringify(demoRecords));
+export async function clearAllRecords(): Promise<void> {
+  try {
+    await AsyncStorage.removeItem(STORAGE_KEYS.RECORDS);
+    console.log('[Storage] All local records cleared.');
+  } catch (error) {
+    console.error('[Storage] Failed to clear all records:', error);
+  }
 }

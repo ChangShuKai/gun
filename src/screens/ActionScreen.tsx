@@ -7,11 +7,17 @@ import {
   SafeAreaView,
   Alert,
   Modal,
+  TextInput,
+  ScrollView,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Ionicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { THEME } from '../constants/theme';
+<<<<<<< Updated upstream
 import { LayoutMode, WidgetType, SplitConfig, HabitRecord, SnapshotMetadata, QuestRecord, PledgeContract, PledgeResult } from '../types';
+=======
+import { LayoutMode, WidgetType, HabitRecord } from '../types';
+>>>>>>> Stashed changes
 import { useApp } from '../context/AppContext';
 import { BreathingButton } from '../components/BreathingButton';
 import { SplitView } from '../components/SplitView';
@@ -44,6 +50,8 @@ import { panelDramaService } from '../services/panelDramaService';
 export const ActionScreen: React.FC = () => {
   const {
     addRecord,
+    activeSplitConfig,
+    updateActiveSplitConfig,
     replicatedConfig,
     clearReplicatedConfig,
     isStealthRecordingActive,
@@ -53,17 +61,10 @@ export const ActionScreen: React.FC = () => {
 
   // Session state: 'idle' | 'running'
   const [sessionState, setSessionState] = useState<'idle' | 'running'>('idle');
-  const [layoutMode, setLayoutMode] = useState<LayoutMode>('split_view');
+  const [layoutMode, setLayoutMode] = useState<LayoutMode>(activeSplitConfig.mode || 'split_view');
 
-  // Split view configuration
-  const [splitConfig, setSplitConfig] = useState<SplitConfig>({
-    mode: 'split_view',
-    topWidget: 'timer',
-    bottomWidget: 'photo',
-    topRatio: 0.5,
-    topPhotoUri: null,
-    bottomPhotoUri: null,
-  });
+  // Split view configuration directly uses persistent context state
+  const splitConfig = activeSplitConfig;
 
   // Elapsed time tracker
   const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
@@ -76,6 +77,8 @@ export const ActionScreen: React.FC = () => {
 
   // Summary dialog after finishing
   const [finishedRecord, setFinishedRecord] = useState<HabitRecord | null>(null);
+  const [userRating, setUserRating] = useState<number>(5);
+  const [userNote, setUserNote] = useState<string>('身心放鬆，節奏健康');
 
   // In-Recording Snapshot and Pacing State
   const [sessionSnapshots, setSessionSnapshots] = useState<SnapshotMetadata[]>([]);
@@ -181,14 +184,13 @@ export const ActionScreen: React.FC = () => {
     if (replicatedConfig) {
       const timer = setTimeout(() => {
         setLayoutMode(replicatedConfig.mode);
-        setSplitConfig(replicatedConfig);
+        updateActiveSplitConfig(replicatedConfig);
         clearReplicatedConfig();
-        // Show friendly feedback
         Alert.alert('已復刻歷史佈局', '成功載入歷史視窗配置與素材！點擊「開始」即可展開。');
       }, 0);
       return () => clearTimeout(timer);
     }
-  }, [replicatedConfig, clearReplicatedConfig]);
+  }, [replicatedConfig, clearReplicatedConfig, updateActiveSplitConfig]);
 
   // Handle giant start button click
   const handleStartPress = () => {
@@ -221,6 +223,9 @@ export const ActionScreen: React.FC = () => {
     setElapsedSeconds(0);
     setSessionSnapshots([]);
     setCurrentArousal(1.0);
+
+    // Save mode preference
+    updateActiveSplitConfig({ mode });
 
     // If stealth recording is on, start background recording
     if (isStealthRecordingActive && recorderRef.current) {
@@ -270,6 +275,7 @@ export const ActionScreen: React.FC = () => {
       layoutMode,
       splitConfig: { ...splitConfig, mode: layoutMode },
       videoUri: recordedVideoUri,
+<<<<<<< Updated upstream
       snapshots: sessionSnapshots,
       notes: '個人放鬆與習慣追蹤',
     };
@@ -284,6 +290,13 @@ export const ActionScreen: React.FC = () => {
       await refreshPledgeStatus();
     }
 
+=======
+      notes: userNote,
+      rating: userRating,
+    };
+
+    // Save with verified write
+>>>>>>> Stashed changes
     await addRecord(newRecord);
     setFinishedRecord(newRecord);
     setSessionState('idle');
@@ -328,6 +341,18 @@ export const ActionScreen: React.FC = () => {
     setCurrentScreen('gate');
   };
 
+  const handleSaveSummary = async () => {
+    if (finishedRecord) {
+      const updated: HabitRecord = {
+        ...finishedRecord,
+        notes: userNote.trim() || '個人放鬆與習慣追蹤',
+        rating: userRating,
+      };
+      await addRecord(updated);
+    }
+    setFinishedRecord(null);
+  };
+
   const handleOpenWidgetPicker = (pane: 'top' | 'bottom') => {
     setTargetPane(pane);
     setWidgetPickerVisible(true);
@@ -335,15 +360,31 @@ export const ActionScreen: React.FC = () => {
 
   const handleWidgetSelected = (widget: WidgetType) => {
     if (targetPane === 'top') {
-      setSplitConfig((prev) => ({ ...prev, topWidget: widget }));
+      updateActiveSplitConfig({ topWidget: widget });
     } else if (targetPane === 'bottom') {
-      setSplitConfig((prev) => ({ ...prev, bottomWidget: widget }));
+      updateActiveSplitConfig({ bottomWidget: widget });
     }
     if (widget === 'camera') {
       girlfriendCompanion.triggerEvent('guidance');
     }
     setWidgetPickerVisible(false);
   };
+
+  const handleRatioChange = (r: number) => {
+    updateActiveSplitConfig({ topRatio: r });
+  };
+
+  const handleTopPhotoSelected = (uri: string) => {
+    updateActiveSplitConfig({ topPhotoUri: uri });
+  };
+
+  const handleBottomPhotoSelected = (uri: string) => {
+    updateActiveSplitConfig({ bottomPhotoUri: uri });
+  };
+
+  const handleTimerTick = useCallback((sec: number) => {
+    setElapsedSeconds(sec);
+  }, []);
 
   const toggleStealthRecording = async () => {
     try {
@@ -493,7 +534,7 @@ export const ActionScreen: React.FC = () => {
           <View style={styles.idleContainer}>
             <View style={styles.statusPill}>
               <View style={styles.greenPulseDot} />
-              <Text style={styles.statusPillText}>本地沙盒模式・100% 隱私保護</Text>
+              <Text style={styles.statusPillText}>本地沙盒模式・100% 真實數據</Text>
             </View>
 
             {/* Lockout Warning Banner */}
@@ -527,7 +568,7 @@ export const ActionScreen: React.FC = () => {
             </View>
 
             <View style={styles.quickPresetCard}>
-              <Text style={styles.presetTitle}>預設佈局配置</Text>
+              <Text style={styles.presetTitle}>目前本地工作區配置</Text>
               <View style={styles.presetBadgesRow}>
                 <View style={styles.presetBadge}>
                   <Feather name="columns" size={14} color={THEME.colors.primaryLight} />
@@ -535,11 +576,17 @@ export const ActionScreen: React.FC = () => {
                     上下分割 ({splitConfig.topWidget} + {splitConfig.bottomWidget})
                   </Text>
                 </View>
+                {splitConfig.topPhotoUri && (
+                  <View style={styles.presetBadge}>
+                    <Ionicons name="image" size={14} color={THEME.colors.primaryLight} />
+                    <Text style={styles.presetBadgeText}>頂部素材已綁定</Text>
+                  </View>
+                )}
                 {isStealthRecordingActive && (
                   <View style={[styles.presetBadge, styles.stealthBadge]}>
                     <Ionicons name="shield-checkmark" size={14} color={THEME.colors.danger} />
                     <Text style={[styles.presetBadgeText, { color: THEME.colors.danger }]}>
-                      背景錄影
+                      背景錄影已啟用
                     </Text>
                   </View>
                 )}
@@ -696,7 +743,7 @@ export const ActionScreen: React.FC = () => {
           <View style={styles.fullscreenTimerContainer}>
             <TimerWidget
               isRunning={true}
-              onTimerTick={(sec) => setElapsedSeconds(sec)}
+              onTimerTick={handleTimerTick}
             />
           </View>
         ) : (
@@ -706,10 +753,11 @@ export const ActionScreen: React.FC = () => {
               topWidget={splitConfig.topWidget}
               bottomWidget={splitConfig.bottomWidget}
               topRatio={splitConfig.topRatio}
-              onRatioChange={(r) => setSplitConfig((prev) => ({ ...prev, topRatio: r }))}
+              onRatioChange={handleRatioChange}
               onSelectWidgetPress={handleOpenWidgetPicker}
               topPhotoUri={splitConfig.topPhotoUri}
               bottomPhotoUri={splitConfig.bottomPhotoUri}
+<<<<<<< Updated upstream
               onTopPhotoSelected={(uri) =>
                 setSplitConfig((prev) => ({ ...prev, topPhotoUri: uri }))
               }
@@ -724,6 +772,11 @@ export const ActionScreen: React.FC = () => {
               onSnapshotCaptured={(snap) => setSessionSnapshots((prev) => [...prev, snap])}
               recentSnapshots={sessionSnapshots}
               onOpenCheckIn={() => setDailyCheckInVisible(true)}
+=======
+              onTopPhotoSelected={handleTopPhotoSelected}
+              onBottomPhotoSelected={handleBottomPhotoSelected}
+              onTimerTick={handleTimerTick}
+>>>>>>> Stashed changes
             />
           </View>
         )}
@@ -775,38 +828,39 @@ export const ActionScreen: React.FC = () => {
       >
         <View style={styles.summaryBackdrop}>
           <View style={styles.summaryCard}>
-            <View style={styles.summaryIconCircle}>
-              <Ionicons name="sparkles" size={36} color={THEME.colors.primaryLight} />
-            </View>
+            <ScrollView style={{ width: '100%' }} contentContainerStyle={{ alignItems: 'center' }}>
+              <View style={styles.summaryIconCircle}>
+                <Ionicons name="sparkles" size={36} color={THEME.colors.primaryLight} />
+              </View>
 
-            <Text style={styles.summaryTitle}>太棒了，完成紀錄！</Text>
-            <Text style={styles.summarySub}>身心釋放完畢，數據已安全加密寫入沙盒</Text>
+              <Text style={styles.summaryTitle}>太棒了，完成紀錄！</Text>
+              <Text style={styles.summarySub}>身心釋放完畢，真實數據已持久化寫入本地沙盒</Text>
 
-            <View style={styles.summaryStatsRow}>
-              <View style={styles.statBox}>
-                <Text style={styles.statLabel}>持續時間</Text>
-                <Text style={styles.statValue}>
-                  {Math.floor((finishedRecord?.durationSeconds || 0) / 60)}分{' '}
-                  {(finishedRecord?.durationSeconds || 0) % 60}秒
+              {/* Verified Write Badge */}
+              <View style={styles.verifiedBadge}>
+                <Ionicons name="checkmark-done-circle" size={15} color={THEME.colors.success} />
+                <Text style={styles.verifiedText}>
+                  本地寫入校驗通過：{finishedRecord?.id}
                 </Text>
               </View>
-              <View style={styles.statBox}>
-                <Text style={styles.statLabel}>佈局模式</Text>
-                <Text style={styles.statValue}>
-                  {finishedRecord?.layoutMode === 'split_view' ? '雙視窗分割' : '全螢幕計時'}
-                </Text>
-              </View>
-            </View>
 
-            {finishedRecord?.videoUri && (
-              <View style={styles.videoSavedBadge}>
-                <Ionicons name="lock-closed" size={14} color={THEME.colors.success} />
-                <Text style={styles.videoSavedText}>
-                  機密視訊已隔離存於本地沙盒，可於分析頁以 Face ID 解鎖檢視
-                </Text>
+              <View style={styles.summaryStatsRow}>
+                <View style={styles.statBox}>
+                  <Text style={styles.statLabel}>持續時間</Text>
+                  <Text style={styles.statValue}>
+                    {Math.floor((finishedRecord?.durationSeconds || 0) / 60)}分{' '}
+                    {(finishedRecord?.durationSeconds || 0) % 60}秒
+                  </Text>
+                </View>
+                <View style={styles.statBox}>
+                  <Text style={styles.statLabel}>佈局模式</Text>
+                  <Text style={styles.statValue}>
+                    {finishedRecord?.layoutMode === 'split_view' ? '雙視窗分割' : '全螢幕計時'}
+                  </Text>
+                </View>
               </View>
-            )}
 
+<<<<<<< Updated upstream
             {finishedRecord?.snapshots && finishedRecord.snapshots.length > 0 && (
               <View style={styles.snapshotSavedBadge}>
                 <Ionicons name="camera" size={14} color={THEME.colors.primaryLight} />
@@ -836,6 +890,58 @@ export const ActionScreen: React.FC = () => {
             >
               <Text style={styles.summaryCloseBtnText}>回到主頁</Text>
             </TouchableOpacity>
+=======
+              {finishedRecord?.videoUri && (
+                <View style={styles.videoSavedBadge}>
+                  <Ionicons name="lock-closed" size={14} color={THEME.colors.success} />
+                  <Text style={styles.videoSavedText}>
+                    機密視訊已隔離存於本地沙盒，可於分析頁以 Face ID 解鎖檢視
+                  </Text>
+                </View>
+              )}
+
+              {/* Rating Section */}
+              <View style={styles.inputSection}>
+                <Text style={styles.inputLabel}>體驗評分</Text>
+                <View style={styles.starsRow}>
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <TouchableOpacity
+                      key={star}
+                      onPress={() => setUserRating(star)}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons
+                        name={star <= userRating ? 'star' : 'star-outline'}
+                        size={28}
+                        color={star <= userRating ? '#F59E0B' : THEME.colors.textMuted}
+                      />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* Note Section */}
+              <View style={styles.inputSection}>
+                <Text style={styles.inputLabel}>備註心得</Text>
+                <TextInput
+                  style={styles.textInput}
+                  value={userNote}
+                  onChangeText={setUserNote}
+                  placeholder="輸入備註或感受..."
+                  placeholderTextColor={THEME.colors.textMuted}
+                  maxLength={60}
+                />
+              </View>
+
+              <TouchableOpacity
+                style={styles.summaryCloseBtn}
+                onPress={handleSaveSummary}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.summaryCloseBtnText}>確認保存並回到主頁</Text>
+              </TouchableOpacity>
+            </ScrollView>
+>>>>>>> Stashed changes
           </View>
         </View>
       </Modal>
@@ -1394,49 +1500,65 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.75)',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 24,
+    padding: 20,
   },
   summaryCard: {
     width: '100%',
+    maxHeight: '85%',
     backgroundColor: THEME.colors.surface,
-    borderRadius: 28,
-    padding: 24,
+    borderRadius: 24,
+    padding: 20,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: THEME.colors.borderGlass,
   },
   summaryIconCircle: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     backgroundColor: 'rgba(59, 130, 246, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 14,
+    marginBottom: 10,
   },
   summaryTitle: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '900',
     color: THEME.colors.text,
-    marginBottom: 6,
+    marginBottom: 4,
   },
   summarySub: {
-    fontSize: 13,
+    fontSize: 12,
     color: THEME.colors.textMuted,
     textAlign: 'center',
-    marginBottom: 20,
-    lineHeight: 18,
+    marginBottom: 12,
+    lineHeight: 16,
+  },
+  verifiedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: THEME.radius.full,
+    marginBottom: 14,
+  },
+  verifiedText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: THEME.colors.success,
   },
   summaryStatsRow: {
     flexDirection: 'row',
     gap: 12,
     width: '100%',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   statBox: {
     flex: 1,
     backgroundColor: THEME.colors.surfaceSubtle,
-    padding: 14,
+    padding: 12,
     borderRadius: THEME.radius.md,
     alignItems: 'center',
   },
@@ -1446,7 +1568,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   statValue: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '800',
     color: THEME.colors.text,
   },
@@ -1455,7 +1577,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     backgroundColor: 'rgba(16, 185, 129, 0.1)',
-    padding: 12,
+    padding: 10,
     borderRadius: THEME.radius.md,
     borderWidth: 1,
     borderColor: 'rgba(16, 185, 129, 0.3)',
@@ -1469,6 +1591,7 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     fontWeight: '500',
   },
+<<<<<<< Updated upstream
   snapshotSavedBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1487,17 +1610,45 @@ const styles = StyleSheet.create({
     color: THEME.colors.text,
     lineHeight: 16,
     fontWeight: '500',
+=======
+  inputSection: {
+    width: '100%',
+    marginBottom: 12,
+  },
+  inputLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: THEME.colors.textSecondary,
+    marginBottom: 6,
+  },
+  starsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'center',
+    paddingVertical: 4,
+  },
+  textInput: {
+    backgroundColor: THEME.colors.surfaceSubtle,
+    borderRadius: THEME.radius.md,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 13,
+    color: THEME.colors.text,
+    borderWidth: 1,
+    borderColor: THEME.colors.borderGlass,
+>>>>>>> Stashed changes
   },
   summaryCloseBtn: {
     width: '100%',
-    height: 50,
+    height: 48,
     backgroundColor: THEME.colors.primary,
     borderRadius: THEME.radius.md,
     alignItems: 'center',
     justifyContent: 'center',
+    marginTop: 6,
   },
   summaryCloseBtnText: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '800',
     color: '#FFFFFF',
   },

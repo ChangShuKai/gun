@@ -1,4 +1,8 @@
+<<<<<<< Updated upstream
 import React from 'react';
+=======
+import React, { useState, useEffect } from 'react';
+>>>>>>> Stashed changes
 import {
   StyleSheet,
   View,
@@ -57,6 +61,65 @@ export const SplitView: React.FC<SplitViewProps> = ({
   recentSnapshots,
   onOpenCheckIn,
 }) => {
+<<<<<<< Updated upstream
+=======
+  const [containerHeight, setContainerHeight] = useState<number>(500);
+  const ratio = useSharedValue(initialTopRatio || 0.5);
+  const startRatio = useSharedValue(initialTopRatio || 0.5);
+
+  const onLayout = (e: LayoutChangeEvent) => {
+    const { height } = e.nativeEvent.layout;
+    if (height > 0) {
+      setContainerHeight(height);
+    }
+  };
+
+  const notifyRatioChange = (val: number) => {
+    if (onRatioChange) onRatioChange(val);
+  };
+
+  const triggerHaptic = () => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+  };
+
+  const panGesture = Gesture.Pan()
+    .onBegin(() => {
+      startRatio.value = ratio.value;
+      runOnJS(triggerHaptic)();
+    })
+    .onUpdate((event) => {
+      if (containerHeight > 0) {
+        const delta = event.translationY / containerHeight;
+        let newRatio = startRatio.value + delta;
+        // Clamp between 20% and 80%
+        if (newRatio < 0.2) newRatio = 0.2;
+        if (newRatio > 0.8) newRatio = 0.8;
+        ratio.value = newRatio;
+      }
+    })
+    .onEnd(() => {
+      runOnJS(notifyRatioChange)(ratio.value);
+      runOnJS(triggerHaptic)();
+    });
+
+  useEffect(() => {
+    if (initialTopRatio !== undefined) {
+      ratio.value = initialTopRatio;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialTopRatio]);
+
+  const topAnimatedStyle = useAnimatedStyle(() => ({
+    flex: ratio.value,
+  }));
+
+  const bottomAnimatedStyle = useAnimatedStyle(() => ({
+    flex: 1 - ratio.value,
+  }));
+
+>>>>>>> Stashed changes
   const renderWidgetContent = (
     widget: WidgetType,
     pane: 'top' | 'bottom',

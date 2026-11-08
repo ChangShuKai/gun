@@ -8,6 +8,7 @@
     "userInterfaceStyle": "dark",
     "ios": {
       "supportsTablet": true,
+      "bundleIdentifier": "com.healthtracker.gun",
       "infoPlist": {
         "NSCameraUsageDescription": "允許使用相機進行即時預覽與隱私視訊記錄",
         "NSMicrophoneUsageDescription": "允許使用麥克風進行隱私視訊記錄",
@@ -16,7 +17,11 @@
       "bundleIdentifier": "com.healthtracker.app"
     },
     "android": {
+<<<<<<< Updated upstream
       "package": "com.healthtracker.app",
+=======
+      "package": "com.healthtracker.gun",
+>>>>>>> Stashed changes
       "adaptiveIcon": {
         "backgroundColor": "#FFFFFF",
         "foregroundImage": "./assets/android-icon-foreground.png",

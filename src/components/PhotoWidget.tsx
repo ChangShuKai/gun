@@ -17,7 +17,9 @@ import { THEME } from '../constants/theme';
 import {
   copyImageToSandbox,
   listSandboxImages,
+  deleteSandboxMedia,
 } from '../services/mediaStorage';
+import { useApp } from '../context/AppContext';
 
 interface PhotoWidgetProps {
   photoUri?: string | null;
@@ -30,6 +32,7 @@ export const PhotoWidget: React.FC<PhotoWidgetProps> = ({
   onPhotoSelected,
   onClearPhoto,
 }) => {
+  const { refreshSandboxStats } = useApp();
   const [galleryModalVisible, setGalleryModalVisible] = useState<boolean>(false);
   const [sandboxImages, setSandboxImages] = useState<string[]>([]);
   const [isImporting, setIsImporting] = useState<boolean>(false);
@@ -58,11 +61,12 @@ export const PhotoWidget: React.FC<PhotoWidgetProps> = ({
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const sourceUri = result.assets[0].uri;
-        // Copy directly into sandboxed DocumentDirectory
+        // Copy directly into sandboxed DocumentDirectory and verify
         const sandboxedUri = await copyImageToSandbox(sourceUri);
         try {
           await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         } catch {}
+        await refreshSandboxStats();
         onPhotoSelected(sandboxedUri);
         setGalleryModalVisible(false);
       }
@@ -81,6 +85,35 @@ export const PhotoWidget: React.FC<PhotoWidgetProps> = ({
     setGalleryModalVisible(false);
   };
 
+  const handleDeleteSandboxImage = (uri: string) => {
+    Alert.alert(
+      '刪除沙盒圖片',
+      '確定自本地沙盒永久刪除此素材？此動作無法復原。',
+      [
+        { text: '取消', style: 'cancel' },
+        {
+          text: '確認刪除',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteSandboxMedia(uri);
+              await loadSandboxImages();
+              await refreshSandboxStats();
+              if (photoUri === uri && onClearPhoto) {
+                onClearPhoto();
+              }
+              try {
+                await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              } catch {}
+            } catch (err: any) {
+              Alert.alert('刪除失敗', err?.message || '無法刪除檔案');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <View style={styles.container}>
       {photoUri ? (
@@ -89,6 +122,10 @@ export const PhotoWidget: React.FC<PhotoWidgetProps> = ({
             source={{ uri: photoUri }}
             style={styles.image}
             resizeMode="contain"
+            onError={() => {
+              console.warn('[PhotoWidget] Failed to load image from URI:', photoUri);
+              if (onClearPhoto) onClearPhoto();
+            }}
           />
           {/* Quick action bar overlay on top right */}
           <View style={styles.overlayButtons}>
@@ -162,7 +199,7 @@ export const PhotoWidget: React.FC<PhotoWidgetProps> = ({
               <View>
                 <Text style={styles.modalTitle}>沙盒私密圖片庫</Text>
                 <Text style={styles.modalSubtitle}>
-                  共 {sandboxImages.length} 張存於 DocumentDirectory
+                  共 {sandboxImages.length} 張存於本地私有 DocumentDirectory
                 </Text>
               </View>
               <TouchableOpacity
@@ -178,9 +215,16 @@ export const PhotoWidget: React.FC<PhotoWidgetProps> = ({
               style={styles.modalImportBtn}
               onPress={handlePickFromDeviceAndImport}
               activeOpacity={0.8}
+              disabled={isImporting}
             >
-              <Ionicons name="cloud-download-outline" size={18} color="#FFFFFF" />
-              <Text style={styles.modalImportBtnText}>從裝置相簿導入並隔離至沙盒</Text>
+              {isImporting ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <>
+                  <Ionicons name="cloud-download-outline" size={18} color="#FFFFFF" />
+                  <Text style={styles.modalImportBtnText}>從裝置相簿導入並隔離至沙盒</Text>
+                </>
+              )}
             </TouchableOpacity>
 
             {sandboxImages.length === 0 ? (
@@ -195,13 +239,23 @@ export const PhotoWidget: React.FC<PhotoWidgetProps> = ({
                 keyExtractor={(item) => item}
                 numColumns={3}
                 renderItem={({ item }) => (
-                  <TouchableOpacity
-                    style={styles.galleryThumb}
-                    activeOpacity={0.8}
-                    onPress={() => handleSelectExisting(item)}
-                  >
-                    <Image source={{ uri: item }} style={styles.thumbImage} />
-                  </TouchableOpacity>
+                  <View style={styles.thumbWrapper}>
+                    <TouchableOpacity
+                      style={styles.galleryThumb}
+                      activeOpacity={0.8}
+                      onPress={() => handleSelectExisting(item)}
+                    >
+                      <Image source={{ uri: item }} style={styles.thumbImage} />
+                    </TouchableOpacity>
+                    {/* Delete button on top right of thumbnail */}
+                    <TouchableOpacity
+                      style={styles.thumbDeleteBtn}
+                      onPress={() => handleDeleteSandboxImage(item)}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="trash-outline" size={12} color="#FFFFFF" />
+                    </TouchableOpacity>
+                  </View>
                 )}
                 contentContainerStyle={styles.galleryList}
               />
@@ -300,15 +354,15 @@ const styles = StyleSheet.create({
   },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
     justifyContent: 'flex-end',
   },
   modalCard: {
     backgroundColor: THEME.colors.surface,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
+    borderTopLeftRadius: THEME.radius.xl,
+    borderTopRightRadius: THEME.radius.xl,
     padding: 20,
-    maxHeight: '75%',
+    maxHeight: '80%',
     borderWidth: 1,
     borderColor: THEME.colors.borderGlass,
   },
@@ -329,10 +383,10 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   closeBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: THEME.colors.surfaceSubtle,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -351,33 +405,52 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#FFFFFF',
   },
-  galleryList: {
-    paddingBottom: 24,
-  },
-  galleryThumb: {
-    flex: 1 / 3,
-    aspectRatio: 1,
-    padding: 4,
-  },
-  thumbImage: {
-    width: '100%',
-    height: '100%',
-    borderRadius: THEME.radius.sm,
-  },
   emptyGallery: {
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 40,
-    gap: 6,
+    gap: 8,
   },
   emptyGalleryText: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '700',
     color: THEME.colors.textSecondary,
-    marginTop: 8,
   },
   emptyGallerySub: {
     fontSize: 12,
     color: THEME.colors.textMuted,
+  },
+  galleryList: {
+    paddingBottom: 24,
+  },
+  thumbWrapper: {
+    flex: 1 / 3,
+    aspectRatio: 1,
+    padding: 4,
+    position: 'relative',
+  },
+  galleryThumb: {
+    flex: 1,
+    borderRadius: THEME.radius.sm,
+    overflow: 'hidden',
+    backgroundColor: '#000000',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  thumbImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  thumbDeleteBtn: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: 'rgba(239, 68, 68, 0.85)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

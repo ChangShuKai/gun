@@ -8,7 +8,6 @@ const DAILY_CHECKIN_DIR_NAME = 'Vault/DailyCheckIn/';
 const UNDERWEAR_DIR_NAME = 'Vault/Underwear/';
 
 function getBaseDirectory(): string {
-  // Fallback to cache directory if documentDirectory is null (e.g., in some test environments)
   return FileSystem.documentDirectory || FileSystem.cacheDirectory || '';
 }
 
@@ -74,7 +73,7 @@ export async function initMediaSandbox(): Promise<void> {
 
 /**
  * Copies an image into the app's local document directory sandbox.
- * Never touches system photo library.
+ * Verifies real physical file creation and integrity.
  */
 export async function copyImageToSandbox(sourceUri: string): Promise<string> {
   await initMediaSandbox();
@@ -86,6 +85,13 @@ export async function copyImageToSandbox(sourceUri: string): Promise<string> {
     to: destination,
   });
 
+  // Verify write on disk
+  const info = await FileSystem.getInfoAsync(destination);
+  if (!info.exists || info.size === 0) {
+    throw new Error('Sandbox image copy failed or file is empty on disk');
+  }
+
+  console.log(`[MediaStorage] Real image written to sandbox: ${destination} (${info.size} bytes)`);
   return destination;
 }
 
@@ -97,7 +103,7 @@ export async function listSandboxImages(): Promise<string[]> {
     await initMediaSandbox();
     const mediaDir = getMediaDirectoryPath();
     const files = await FileSystem.readDirectoryAsync(mediaDir);
-    
+
     // Sort reverse chronological
     const imageFiles = files
       .filter((file) => /\.(jpg|jpeg|png|webp|gif)$/i.test(file))
@@ -112,7 +118,8 @@ export async function listSandboxImages(): Promise<string[]> {
 }
 
 /**
- * Moves or copies a recorded video file to the persistent records sandbox directory
+ * Moves or copies a recorded video file to the persistent records sandbox directory.
+ * Verifies that the file truly exists on disk.
  */
 export async function saveVideoToSandbox(sourceUri: string): Promise<string> {
   await initMediaSandbox();
@@ -120,7 +127,6 @@ export async function saveVideoToSandbox(sourceUri: string): Promise<string> {
   const destination = `${getVideoDirectoryPath()}${filename}`;
 
   try {
-    // Try move first for speed, fallback to copy
     await FileSystem.moveAsync({
       from: sourceUri,
       to: destination,
@@ -132,6 +138,13 @@ export async function saveVideoToSandbox(sourceUri: string): Promise<string> {
     });
   }
 
+  // Verify disk file
+  const info = await FileSystem.getInfoAsync(destination);
+  if (!info.exists || info.size === 0) {
+    throw new Error('Sandbox video save failed or file is empty on disk');
+  }
+
+  console.log(`[MediaStorage] Real video written to sandbox: ${destination} (${info.size} bytes)`);
   return destination;
 }
 
@@ -158,15 +171,18 @@ export async function listSandboxVideos(): Promise<string[]> {
  */
 export async function deleteSandboxMedia(fileUri: string): Promise<void> {
   try {
+    if (!fileUri) return;
     const info = await FileSystem.getInfoAsync(fileUri);
     if (info.exists) {
       await FileSystem.deleteAsync(fileUri, { idempotent: true });
+      console.log(`[MediaStorage] Deleted sandbox file: ${fileUri}`);
     }
   } catch (error) {
     console.warn('[MediaStorage] Failed to delete media:', error);
   }
 }
 
+<<<<<<< Updated upstream
 /**
  * Saves a snapshot to the private /Documents/Vault/Snapshots/ sandbox directory
  * with bound session metadata.
@@ -417,3 +433,68 @@ export async function saveUnderwearPhoto(
 
   return destination;
 }
+=======
+export interface SandboxStats {
+  imageCount: number;
+  videoCount: number;
+  totalSizeBytes: number;
+  formattedSize: string;
+}
+
+/**
+ * Calculates real disk statistics of sandbox files
+ */
+export async function getSandboxStats(): Promise<SandboxStats> {
+  try {
+    await initMediaSandbox();
+    const mediaDir = getMediaDirectoryPath();
+    const videoDir = getVideoDirectoryPath();
+
+    let imageCount = 0;
+    let videoCount = 0;
+    let totalSizeBytes = 0;
+
+    try {
+      const imgFiles = await FileSystem.readDirectoryAsync(mediaDir);
+      for (const f of imgFiles) {
+        const info = await FileSystem.getInfoAsync(`${mediaDir}${f}`);
+        if (info.exists && !info.isDirectory) {
+          imageCount++;
+          totalSizeBytes += info.size || 0;
+        }
+      }
+    } catch {}
+
+    try {
+      const vidFiles = await FileSystem.readDirectoryAsync(videoDir);
+      for (const f of vidFiles) {
+        const info = await FileSystem.getInfoAsync(`${videoDir}${f}`);
+        if (info.exists && !info.isDirectory) {
+          videoCount++;
+          totalSizeBytes += info.size || 0;
+        }
+      }
+    } catch {}
+
+    const formattedSize =
+      totalSizeBytes < 1024 * 1024
+        ? `${(totalSizeBytes / 1024).toFixed(1)} KB`
+        : `${(totalSizeBytes / (1024 * 1024)).toFixed(2)} MB`;
+
+    return {
+      imageCount,
+      videoCount,
+      totalSizeBytes,
+      formattedSize,
+    };
+  } catch (err) {
+    console.warn('[MediaStorage] Failed to get sandbox stats:', err);
+    return {
+      imageCount: 0,
+      videoCount: 0,
+      totalSizeBytes: 0,
+      formattedSize: '0 KB',
+    };
+  }
+}
+>>>>>>> Stashed changes
