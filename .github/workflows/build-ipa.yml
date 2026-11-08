@@ -13,7 +13,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'npm'
 
       - name: Install Dependencies
@@ -52,8 +52,8 @@ jobs:
           cd ios
           export NODE_BINARY=$(which node)
           
-          # 自動偵測 Workspace 和 Scheme 名稱
-          WORKSPACE_FILE=$(ls *.xcworkspace | head -n 1)
+          # 自動偵測 Workspace 和 Scheme 名稱 (加上 -d 修正目錄讀取問題)
+          WORKSPACE_FILE=$(ls -d *.xcworkspace | head -n 1)
           SCHEME_NAME=$(basename "$WORKSPACE_FILE" .xcworkspace)
           
           echo "Detected Workspace: $WORKSPACE_FILE"
