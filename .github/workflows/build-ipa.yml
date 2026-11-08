@@ -124,9 +124,7 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: 17
-
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+          cache: 'gradle'
 
       - name: Install Dependencies
         run: npm install
@@ -144,5 +142,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Android-APK-Build
-          path: android/app/build/outputs/apk/release/*.apk
+          path: android/app/build/outputs/apk/**/*.apk
           retention-days: 7
