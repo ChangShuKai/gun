@@ -12,7 +12,8 @@
         "NSCameraUsageDescription": "允許使用相機進行即時預覽與隱私視訊記錄",
         "NSMicrophoneUsageDescription": "允許使用麥克風進行隱私視訊記錄",
         "NSFaceIDUsageDescription": "允許使用 Face ID 解鎖健康紀錄與機密媒體"
-      }
+      },
+      "bundleIdentifier": "com.healthtracker.app"
     },
     "android": {
       "package": "com.healthtracker.app",
