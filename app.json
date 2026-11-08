@@ -1,0 +1,53 @@
+{
+  "expo": {
+    "name": "健康尻尻",
+    "slug": "health-tracker",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "允許使用相機進行即時預覽與隱私視訊記錄",
+        "NSMicrophoneUsageDescription": "允許使用麥克風進行隱私視訊記錄",
+        "NSFaceIDUsageDescription": "允許使用 Face ID 解鎖健康紀錄與機密媒體"
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0F172A",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT"
+      ],
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-video",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "允許使用相機進行即時預覽與隱私視訊記錄",
+          "microphonePermission": "允許使用麥克風進行隱私視訊記錄"
+        }
+      ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "允許使用 Face ID 解鎖健康紀錄與機密媒體"
+        }
+      ],
+      "expo-font"
+    ]
+  }
+}

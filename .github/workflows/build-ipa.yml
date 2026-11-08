@@ -1,0 +1,102 @@
+name: Build Universal iOS IPA
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-ios:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Prebuild iOS Native Project
+        run: npx expo prebuild --platform ios --clean
+
+      - name: Patch Podfile & Install CocoaPods
+        run: |
+          cd ios
+          python3 -c "
+          with open('Podfile', 'r') as f:
+              content = f.read()
+
+          patch = '''
+              installer.pods_project.targets.each do |target|
+                target.build_configurations.each do |config|
+                  config.build_settings['ENABLE_USER_SCRIPT_SANDBOXING'] = 'NO'
+                  config.build_settings['EXPANDED_CODE_SIGN_IDENTITY'] = ''
+                  config.build_settings['CODE_SIGNING_REQUIRED'] = 'NO'
+                  config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
+                end
+              end
+          '''
+          if 'post_install do |installer|' in content:
+              content = content.replace('post_install do |installer|', 'post_install do |installer|' + patch)
+              with open('Podfile', 'w') as f:
+                  f.write(content)
+          "
+          pod install
+          cd ..
+
+      - name: Build iOS Application (Archive)
+        run: |
+          cd ios
+          export NODE_BINARY=$(which node)
+          
+          # 自動偵測 Workspace 和 Scheme 名稱
+          WORKSPACE_FILE=$(ls *.xcworkspace | head -n 1)
+          SCHEME_NAME=$(basename "$WORKSPACE_FILE" .xcworkspace)
+          
+          echo "Detected Workspace: $WORKSPACE_FILE"
+          echo "Detected Scheme: $SCHEME_NAME"
+
+          xcodebuild archive \
+            -workspace "$WORKSPACE_FILE" \
+            -scheme "$SCHEME_NAME" \
+            -configuration Release \
+            -destination "generic/platform=iOS" \
+            -archivePath "$(pwd)/AppArchive.xcarchive" \
+            CODE_SIGN_STYLE="Manual" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            PROVISIONING_PROFILE_SPECIFIER="" \
+            ENABLE_USER_SCRIPT_SANDBOXING=NO
+
+      - name: Package iOS IPA
+        run: |
+          # 統一從固定的 AppArchive.xcarchive 提取
+          APP_PATH=$(find ios/AppArchive.xcarchive/Products/Applications -name "*.app" | head -n 1)
+
+          if [ -z "$APP_PATH" ]; then
+            echo "Searching fallback app path:"
+            APP_PATH=$(find . -type d -name "*.app" ! -path "*/Pods/*" | head -n 1)
+          fi
+
+          echo "Target App Path: $APP_PATH"
+          if [ -z "$APP_PATH" ]; then
+            echo "Error: No .app found in archive."
+            exit 1
+          fi
+
+          # 自動取得 App 原始名稱並打包
+          APP_NAME=$(basename "$APP_PATH" .app)
+          mkdir -p Payload
+          cp -r "$APP_PATH" Payload/
+          zip -r "${APP_NAME}.ipa" Payload
+
+      - name: Upload iOS IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: iOS-IPA-Build
+          path: "*.ipa"
+          retention-days: 7
