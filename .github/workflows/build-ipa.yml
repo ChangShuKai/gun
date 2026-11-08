@@ -50,9 +50,13 @@ jobs:
       - name: Build iOS Application (Archive)
         run: |
           cd ios
+          
+          # 建立 Node.js 軟連結，確保 Xcode PhaseScriptExecution 找得到 Node
+          sudo ln -s $(which node) /usr/local/bin/node || true
+          
           export NODE_BINARY=$(which node)
           
-          # 自動偵測 Workspace 和 Scheme 名稱 (加上 -d 修正目錄讀取問題)
+          # 自動偵測 Workspace 和 Scheme 名稱
           WORKSPACE_FILE=$(ls -d *.xcworkspace | head -n 1)
           SCHEME_NAME=$(basename "$WORKSPACE_FILE" .xcworkspace)
           
@@ -70,7 +74,8 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
             PROVISIONING_PROFILE_SPECIFIER="" \
-            ENABLE_USER_SCRIPT_SANDBOXING=NO
+            ENABLE_USER_SCRIPT_SANDBOXING=NO \
+            NODE_BINARY=$(which node)
 
       - name: Package iOS IPA
         run: |
