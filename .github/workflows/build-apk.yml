@@ -41,15 +41,26 @@ jobs:
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+        env:
+          ANDROID_HOME: ${{ runner.temp }}/android-sdk
+          ANDROID_SDK_ROOT: ${{ runner.temp }}/android-sdk
 
       - name: Accept Android SDK Licenses
         run: |
-          yes | sdkmanager --licenses || true
+          export ANDROID_HOME="${{ runner.temp }}/android-sdk"
+          export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
+          if command -v sdkmanager &> /dev/null; then
+            yes | sdkmanager --licenses || true
+          elif [ -f "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" ]; then
+            yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses || true
+          fi
 
       - name: Install Dependencies
         run: npm install
 
       - name: Prebuild Android Native Project
+        env:
+          ANDROID_HOME: ${{ runner.temp }}/android-sdk
         run: npx expo prebuild --platform android --clean
 
       - name: Configure Android Signing & Gradle
@@ -62,7 +73,7 @@ jobs:
             if (content.includes('signingConfig signingConfigs.release')) {
               content = content.replace('signingConfig signingConfigs.release', 'signingConfig signingConfigs.debug');
             } else if (/buildTypes\s*\{[\s\S]*?release\s*\{/.test(content)) {
-              content = content.replace(/(buildTypes\s*\{[\s\S]*?release\s*\{)/, '$1\n            signingConfig signingConfigs.debug');
+              content = content.replace(/(buildTypes\s*\{[\s\S]*?release\s*\{)/, '\$1\n            signingConfig signingConfigs.debug');
             }
             fs.writeFileSync(file, content);
             console.log('Successfully patched android/app/build.gradle for universal installation');
@@ -70,6 +81,9 @@ jobs:
           "
 
       - name: Build Android APK (${{ github.event.inputs.build_type || 'release' }})
+        env:
+          ANDROID_HOME: ${{ runner.temp }}/android-sdk
+          ANDROID_SDK_ROOT: ${{ runner.temp }}/android-sdk
         run: |
           cd android
           chmod +x gradlew
